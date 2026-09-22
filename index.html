@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hydrotest Digital System</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f3f5f7;color:#17202a}
+header{position:sticky;top:0;z-index:5;background:#172b3a;color:white;padding:14px 16px}
+header h1{font-size:18px;margin:0}header small{opacity:.75}
+nav{position:fixed;bottom:0;left:0;right:0;background:white;border-top:1px solid #ddd;display:grid;grid-template-columns:repeat(5,1fr);z-index:10}
+nav button{border:0;background:white;padding:10px 2px;font-size:11px;color:#344054}
+nav button.active{color:#1769aa;font-weight:bold}
+main{padding:14px 14px 78px;max-width:700px;margin:auto}.page{display:none}.page.active{display:block}
+.card{background:white;border:1px solid #ddd;border-radius:12px;padding:14px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.metric{font-size:23px;font-weight:bold;margin-top:5px}
+label{display:block;font-size:12px;color:#667085;margin-bottom:9px}input,select{width:100%;padding:10px;border:1px solid #c9ced6;border-radius:7px;background:white}
+button.primary,button.warn,button.danger,button.secondary{border:0;border-radius:7px;padding:10px 12px;color:white;margin:3px 2px}
+.primary{background:#1769aa}.warn{background:#b54708}.danger{background:#b42318}.secondary{background:#667085}
+.row{display:flex;gap:6px;flex-wrap:wrap}.stage{border:1px solid #ddd;border-radius:9px;padding:10px;margin:8px 0}
+.badge{display:inline-block;padding:5px 8px;border-radius:6px;background:#eef2f6;font-size:12px}.ok{background:#dcfae6;color:#027a48}.locked{background:#fee4e2;color:#b42318}
+canvas{width:100%;height:220px;background:#fbfbfb;border:1px solid #ddd;border-radius:8px}
+h2{font-size:18px;margin-top:4px}h3{font-size:15px}.muted{color:#667085;font-size:12px}
+</style></head>
+<body>
+<header><h1>HYDROTEST DIGITAL SYSTEM</h1><small>Mobile Prototype • Simulation Mode</small></header>
+<main>
+<section id="dashboard" class="page active">
+<h2>Dashboard</h2>
+<div class="grid">
+<div class="card"><span class="muted">PT-001</span><div id="pt1" class="metric">—</div><span class="muted">0–250 barg</span></div>
+<div class="card"><span class="muted">PT-002</span><div id="pt2" class="metric">—</div><span class="muted">0–400 barg</span></div>
+<div class="card"><span class="muted">TT-001</span><div id="tt1" class="metric">—</div><span class="muted">°C</span></div>
+<div class="card"><span class="muted">TT-002</span><div id="tt2" class="metric">—</div><span class="muted">°C</span></div>
+</div>
+<div class="card"><b>System Status</b><p><span class="badge ok">SIMULATION ONLINE</span></p><p class="muted">Prototype uses simulated pressure/temperature signals. Not for real pressure testing.</p></div>
+</section>
+
+<section id="project" class="page">
+<h2>Project & Test Setup</h2><div class="card">
+<label>Project Name<input id="pname" value="Demo Hydrotest Project"></label>
+<label>Client<input id="client"></label><label>Test Package<input id="package"></label>
+<label>Test Section<input id="section"></label><label>Procedure No.<input id="procno" value="HT-PRO-001"></label>
+<label>Revision<input id="procrev" value="Rev.0"></label><label>Test Pressure (barg)<input id="pressure" type="number" value="144"></label>
+<label>Operator<input id="operator"></label><label>Witness<input id="witness"></label>
+<button class="primary" onclick="saveProject()">Save Project</button></div>
+<div class="card"><b>Test ID</b><p id="testid" class="muted">Not created</p><span id="projectStatus" class="badge">DRAFT</span></div>
+</section>
+
+<section id="procedure" class="page">
+<h2>Procedure Builder</h2><div class="card">
+<p class="muted">Configure each approved project procedure. Target may be % Test Pressure or absolute barg.</p>
+<div id="stages"></div>
+<div class="row"><button class="primary" onclick="addStage()">+ ADD STEP</button><button class="warn" onclick="lockProcedure()">APPROVE & LOCK</button></div>
+</div></section>
+
+<section id="live" class="page">
+<h2>Live Test</h2><div class="card">
+<p>Test: <b id="liveTest">No project</b></p><p>State: <span id="state" class="badge">IDLE</span></p>
+<div class="grid"><div><span class="muted">PT-001</span><div id="lpt1" class="metric">—</div></div><div><span class="muted">PT-002</span><div id="lpt2" class="metric">—</div></div>
+<div><span class="muted">Actual Rate</span><div id="rate" class="metric">—</div></div><div><span class="muted">Elapsed</span><div id="elapsed" class="metric">00:00</div></div></div>
+<br><canvas id="chart" width="700" height="220"></canvas>
+<div class="row"><button class="primary" onclick="startTest()">START</button><button class="secondary" onclick="pauseTest()">PAUSE</button><button class="secondary" onclick="resumeTest()">RESUME</button><button class="primary" onclick="completeTest()">COMPLETE</button><button class="danger" onclick="abortTest()">ABORT</button></div>
+<p class="muted">Samples recorded: <span id="samples">0</span></p></div></section>
+
+<section id="analysis" class="page">
+<h2>Test Analysis</h2><div class="card"><div class="grid">
+<div><span class="muted">Max PT-002</span><div id="amax">—</div></div><div><span class="muted">Min PT-002</span><div id="amin">—</div></div>
+<div><span class="muted">Average PT-002</span><div id="aavg">—</div></div><div><span class="muted">Samples</span><div id="acount">0</div></div>
+</div><hr><p class="muted">Analysis is based on locally stored simulation samples.</p><button class="primary" onclick="clearSamples()">Clear Test Data</button></div></section>
+</main>
+<nav>
+<button id="n0" class="active" onclick="page('dashboard',0)">🏠<br>Dashboard</button>
+<button id="n1" onclick="page('project',1)">📁<br>Project</button>
+<button id="n2" onclick="page('procedure',2)">⚙️<br>Procedure</button>
+<button id="n3" onclick="page('live',3)">▶️<br>Live Test</button>
+<button id="n4" onclick="page('analysis',4)">📊<br>Analysis</button>
+</nav>
+<script>
+const S=localStorage;
+let project=JSON.parse(S.getItem('ht_project')||'null');
+let stages=JSON.parse(S.getItem('ht_stages')||'[]');
+let samples=JSON.parse(S.getItem('ht_samples')||'[]');
+let state='IDLE',timer=null,startAt=0,lastP=null;
+
+function page(id,n){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));document.getElementById('n'+n).classList.add('active');if(id==='project')loadProject();if(id==='procedure')renderStages();if(id==='analysis')analysis()}
+function saveProject(){
+project={testId:'HT-'+new Date().toISOString().replace(/[-:TZ.]/g,'').slice(0,14),name:pname.value,client:client.value,package:package.value,section:section.value,procno:procno.value,procrev:procrev.value,pressure:Number(pressure.value),operator:operator.value,witness:witness.value,status:'DRAFT'};
+S.setItem('ht_project',JSON.stringify(project));loadProject();alert('Project saved: '+project.testId)
+}
+function loadProject(){if(!project)return;testid.innerText=project.testId+' — '+project.name;projectStatus.innerText=project.status;liveTest.innerText=project.testId}
+function addStage(){stages.push({name:'Stage '+(stages.length+1),mode:'PERCENT',target:100,ramp:1,min:.8,max:1.2,hold:60,stab:60});S.setItem('ht_stages',JSON.stringify(stages));renderStages()}
+function renderStages(){stagesEl=document.getElementById('stages');stagesEl.innerHTML=stages.map((x,i)=>`<div class="stage"><b>Step ${i+1}</b>
+<label>Name<input value="${x.name}" onchange="stages[${i}].name=this.value"></label>
+<label>Target Mode<select onchange="stages[${i}].mode=this.value"><option ${x.mode==='PERCENT'?'selected':''}>PERCENT</option><option ${x.mode==='ABSOLUTE'?'selected':''}>ABSOLUTE</option></select></label>
+<label>Target<input type=number value="${x.target}" onchange="stages[${i}].target=Number(this.value)"></label>
+<label>Ramp Rate barg/min<input type=number step=.1 value="${x.ramp}" onchange="stages[${i}].ramp=Number(this.value)"></label>
+<label>Min Rate<input type=number step=.1 value="${x.min}" onchange="stages[${i}].min=Number(this.value)"></label>
+<label>Max Rate<input type=number step=.1 value="${x.max}" onchange="stages[${i}].max=Number(this.value)"></label>
+<label>Hold seconds<input type=number value="${x.hold}" onchange="stages[${i}].hold=Number(this.value)"></label>
+<label>Stabilisation seconds<input type=number value="${x.stab}" onchange="stages[${i}].stab=Number(this.value)"></label>
+<button class="secondary" onclick="stages.splice(${i},1);S.setItem('ht_stages',JSON.stringify(stages));renderStages()">Delete</button></div>`).join('')}
+function lockProcedure(){if(!project)return alert('Create project first');project.status='LOCKED';S.setItem('ht_project',JSON.stringify(project));S.setItem('ht_stages',JSON.stringify(stages));loadProject();alert('Procedure APPROVED & LOCKED')}
+function signal(){let t=Date.now()/1000;let p=70+35*Math.sin(t/9);return{p1:Math.max(0,p+Math.random()-.5),p2:Math.max(0,p+Math.random()-.5),t1:28+.3*Math.sin(t/15),t2:28.2+.3*Math.sin(t/15)}}
+function startTest(){if(!project)return alert('Create project first');state='RUNNING';startAt=Date.now();lastP=null;document.getElementById('state').innerText=state;timer=setInterval(tick,1000)}
+function pauseTest(){if(state==='RUNNING'){state='PAUSED';document.getElementById('state').innerText=state;clearInterval(timer)}}
+function resumeTest(){if(state==='PAUSED'){state='RUNNING';document.getElementById('state').innerText=state;timer=setInterval(tick,1000)}}
+function completeTest(){if(state==='RUNNING'||state==='PAUSED'){state='COMPLETED';document.getElementById('state').innerText=state;clearInterval(timer);analysis()}}
+function abortTest(){if(!confirm('Abort this test?'))return;state='ABORTED';document.getElementById('state').innerText=state;clearInterval(timer)}
+function tick(){let d=signal();lpt1.innerText=d.p1.toFixed(2)+' barg';lpt2.innerText=d.p2.toFixed(2)+' barg';let r=lastP===null?0:d.p2-lastP;lastP=d.p2;rate.innerText=r.toFixed(2)+' barg/s';elapsed.innerText=new Date(Date.now()-startAt).toISOString().substr(14,5);samples.push({time:new Date().toISOString(),p1:d.p1,p2:d.p2,t1:d.t1,t2:d.t2,rate:r,state});S.setItem('ht_samples',JSON.stringify(samples));document.getElementById('samples').innerText=samples.length;draw()}
+function draw(){let c=chart,x=c.getContext('2d');x.clearRect(0,0,c.width,c.height);let a=samples.slice(-100);x.beginPath();a.forEach((v,i)=>{let X=i*c.width/100,Y=c.height-20-v.p2/150*c.height;i?x.lineTo(X,Y):x.moveTo(X,Y)});x.stroke()}
+function analysis(){if(!samples.length){amax.innerText=amin.innerText=aavg.innerText='—';acount.innerText=0;return}let a=samples.map(x=>x.p2),mx=Math.max(...a),mn=Math.min(...a),av=a.reduce((q,v)=>q+v,0)/a.length;amax.innerText=mx.toFixed(2)+' barg';amin.innerText=mn.toFixed(2)+' barg';aavg.innerText=av.toFixed(2)+' barg';acount.innerText=a.length}
+function clearSamples(){if(confirm('Clear local test samples?')){samples=[];S.removeItem('ht_samples');analysis()}}
+loadProject();renderStages();analysis();
+</script><script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js'));}</script></body></html>
